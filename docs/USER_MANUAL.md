@@ -26,7 +26,7 @@ From `frontend/`, start Vite:
 npm.cmd run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Visit `http://127.0.0.1:5173/`. The normal API address is `http://127.0.0.1:8000`; API docs are at `http://127.0.0.1:8000/docs`. The frontend expects this backend address unless `VITE_API_BASE_URL` is configured at frontend build time.
+Visit `http://127.0.0.1:5173/`. The normal API address is `http://127.0.0.1:8000`; API docs are at `http://127.0.0.1:8000/docs`. The frontend expects this backend address unless `VITE_API_BASE_URL` is configured at frontend build time. To configure it, copy `frontend/.env.example` to `frontend/.env.local`, edit the URL, and restart the Vite process.
 
 ## 3. Understand a scenario
 
@@ -62,13 +62,16 @@ python -c "from app.experiments.runner import run_all_experiments; r=run_all_exp
 
 ## 8. Verification commands
 
-From the repository root, run the backend tests and frontend production build:
+From the repository root, run the repository quality gates and frontend production build:
 
 ```powershell
+python scripts\validate_scenarios.py
 python -m pytest backend\tests -v
 cd frontend
-npm.cmd run build
+npm.cmd run check
 ```
+
+The frontend `check` script runs strict TypeScript checking before the Vite production build. Use `npm run check` on POSIX shells.
 
 ## 9. Troubleshooting
 

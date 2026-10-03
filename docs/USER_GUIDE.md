@@ -21,9 +21,11 @@ The experiment report is calculated by the backend from the loaded scenario; it 
 
 ### Scenario editor
 
-This page has **Example Scenarios** and **Custom Scenario** tabs. Example cards are Level 1 single capability, Level 2 compatible pair, Level 3 full chain, Level 4 branching, and Level 5 everything. **Load & Run** posts the selected bundled example to the backend as the active scenario, then navigates to Experiments and triggers a run. The source JSON file remains unchanged; the active server scenario is the working copy.
+This page has **Example Scenarios** and **Custom Scenario** tabs. Example cards are Level 1 single capability, Level 2 compatible pair, Level 3 full chain, Level 4 branching, and Level 5 everything. Level 3 is intentionally useful for inspecting a named three-step dataset whose formal declarations do not currently satisfy every handoff, so its chain experiment may be skipped. **Load & Run** posts the selected bundled example to the backend as the active scenario, then navigates to Experiments and triggers a run. The source JSON file remains unchanged; the active server scenario is the working copy.
 
 In Custom Scenario, edit scenario details, states, goals, and capabilities using structured controls. **Add state**, **Add goal**, **Add capability**, **Add condition**, **Add field**, and **Add item** create entries; remove buttons delete rows. **Validate & save scenario** sends the whole draft to the backend, which validates it and replaces the active in-memory scenario. **Reload backend** discards unsaved draft edits and reloads what is currently active. **Import JSON** loads a file into the form; it does not save until you choose Validate & save. **Download** exports the current draft. An advanced JSON editor is also available.
+
+The frontend API URL defaults to `http://127.0.0.1:8000`. For another backend address, copy `frontend/.env.example` to `frontend/.env.local`, set `VITE_API_BASE_URL`, and restart Vite.
 
 Variable and value combobox suggestions are drawn from values already present in this scenario's states, goals, preconditions, effects, and constraints. Resource and mechanism-key suggestions are drawn from other current capabilities. Suggestions use browser datalists: you can select a suggestion or type a new value. Smart values parse `true`, `false`, `null`, numbers, and valid JSON-looking values into their formal types.
 

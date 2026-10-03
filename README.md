@@ -14,7 +14,7 @@ I represent preconditions, effects, typed inputs and outputs, constraints, resou
 
 ## Architecture and stack
 
-The backend uses Python, FastAPI, Pydantic, and pytest. The frontend uses React, TypeScript, Vite, Recharts, and lucide-react. Scenarios are JSON files in `data/scenarios/`. Browser pages call the FastAPI endpoints in `backend/app/main.py`; embedding, compatibility, composition, and experiment logic live in separate backend modules.
+The backend uses Python, FastAPI, Pydantic, and pytest. The frontend uses React, TypeScript, Vite, Recharts, and lucide-react. Scenarios are JSON files in `data/scenarios/`. Browser pages call the FastAPI endpoints in `backend/app/main.py`; embedding, compatibility, composition, and experiment logic live in separate backend modules. The browser API base defaults to `http://127.0.0.1:8000`; copy `frontend/.env.example` to `frontend/.env.local` when a different API URL is needed.
 
 See [the architecture guide](docs/ARCHITECTURE.md) and [the formal design](docs/DESIGN.md) for details.
 
@@ -26,11 +26,13 @@ backend/app/embedding/    Named sparse vector encoding and similarity
 backend/app/composition/  Directional compatibility and ordered composition
 backend/app/experiments/  Scenario-driven experiment runner
 backend/tests/            Backend test suite
+scripts/                  Repository-level data validation checks
 frontend/src/pages/       Overview, capability, relationship, composition,
                           experiment, and scenario editor pages
 frontend/src/services/    API client
 data/scenarios/           Commerce, composition, and Level 1–5 examples
 docs/                     Design, architecture, reports, and user documentation
+pyproject.toml            Shared pytest discovery/options
 ```
 
 ## Installation and run
@@ -58,13 +60,16 @@ npm.cmd run dev -- --host 127.0.0.1 --port 5173
 
 Open `http://127.0.0.1:5173/`. The backend API is at `http://127.0.0.1:8000`; its interactive API reference is at `http://127.0.0.1:8000/docs`.
 
-To run verification from the repository root:
+To run the local quality gates from the repository root:
 
 ```powershell
+python scripts\validate_scenarios.py
 python -m pytest backend\tests -v
 cd frontend
-npm.cmd run build
+npm.cmd run check
 ```
+
+`validate_scenarios.py` checks every JSON file under `data/scenarios/` against the backend's Pydantic schema. The frontend `check` script runs the strict TypeScript build and Vite production build. Use `npm run ...` instead of `npm.cmd run ...` in a POSIX shell.
 
 To run the default commerce experiment report from `backend/`:
 

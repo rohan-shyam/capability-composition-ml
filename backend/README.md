@@ -25,7 +25,13 @@ $env:PYTHONPATH = "backend"
 python -m uvicorn app.main:app --reload --app-dir backend
 ```
 
-API docs are served at `http://127.0.0.1:8000/docs`. The default dataset is `data/scenarios/commerce.json`.
+API docs are served at `http://127.0.0.1:8000/docs`. The default dataset is `data/scenarios/commerce.json`; the other checked-in scenarios are under `data/scenarios/examples/` and `data/scenarios/composition-example.json`.
+
+Validate all checked-in scenario files from the repository root:
+
+```powershell
+python scripts\validate_scenarios.py
+```
 
 ## API outline
 

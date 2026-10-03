@@ -47,3 +47,9 @@ Confirmed against route decorators in `backend/app/main.py` and calls in `fronte
 `backend/app/models/formal.py` defines the strict Pydantic state, goal, predicate, field, cost, capability, and scenario structures. `backend/app/embedding/encoder.py` extracts deterministic features and computes sparse cosine and section-weighted capability comparison. Predicate truth and state/goal checks live in `backend/app/services/formal_logic.py`; directional handoff checks with evidence live in `backend/app/composition/compatibility.py`. `backend/app/composition/composer.py` handles linear composition and operational aggregation, while `backend/app/experiments/runner.py` selects experiment evidence and skip reasons from declared capabilities.
 
 There is no path planner in this architecture. The system describes and evaluates capability representations and compositions; it does not execute the represented services.
+
+## Configuration and quality gates
+
+The frontend API client defaults to `http://127.0.0.1:8000`. Set `VITE_API_BASE_URL` in a local frontend environment file when the API runs elsewhere; `frontend/.env.example` is the checked-in template and `.env.local` is ignored by Git. Vite reads this value at build time, so restart the dev server after changing it.
+
+From the repository root, `python scripts/validate_scenarios.py` validates every checked-in scenario against the backend Pydantic schema, and `python -m pytest backend/tests -v` runs the backend suite. From `frontend/`, `npm run check` runs strict TypeScript checking followed by the production Vite build. These checks cover sample-data schema drift, backend behavior, and frontend compilation; they are not a replacement for end-to-end browser testing.

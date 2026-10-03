@@ -6,7 +6,7 @@
 - **Phase 2 — Frontend:** React/TypeScript pages were added for Overview, Scenario editor, Capabilities, Relationships, Composition, and Experiments. The editor now uses structured fields, scenario-derived datalist suggestions, an example library, import/download, and an optional advanced JSON editor.
 - **Phase 3 — Documentation:** completed 2026-10-03 (Asia/Calcutta). Deliverables, current implementation, dataset, results, and user experience are documented below and in `docs/`.
 
-The primary assignment specification is `C:\Users\Admin\Downloads\markitdown\output2.md`. It requires an embedding for formal application entities, capability composition, five experiments, evaluation, an experimental dataset, and a technical report. Assignment 1 path search and replanning are explicitly outside scope.
+The original assignment specification is external to this repository. Its recorded requirements are an embedding for formal application entities, capability composition, five experiments, evaluation, an experimental dataset, and a technical report. Assignment 1 path search and replanning are explicitly outside scope.
 
 ## Final architecture summary
 
@@ -53,10 +53,10 @@ Current routes are `GET /api/health`, `GET/POST /api/scenario`, `POST /api/encod
 - Created `docs/TECHNICAL_REPORT.md` — required twelve-section report.
 - Created `docs/USER_MANUAL.md` — setup, scenario editing, API, verification, and troubleshooting.
 - Created `docs/USER_GUIDE.md` — first-visit page walkthrough, quick start, editor explanation, and glossary.
-- Updated `docs/EMBEDDING_DESIGN.md` and `docs/PHASE_2_USER_GUIDE.md` to point to the current docs.
+- Updated `docs/EMBEDDING_DESIGN.md` as a redirect to the authoritative design and maintained `docs/USER_GUIDE.md` as the current website guide.
 - Updated `PROJECT_STATE.md` with this final phase record.
 
-No backend or frontend logic, schema, or endpoint was changed in Phase 3. One dataset file was added to close the explicit-composite coverage gap.
+No backend or frontend logic, schema, or endpoint was changed in Phase 3. One dataset file was added to close the explicit-composite coverage gap. Repository-level validation is now documented by `scripts/validate_scenarios.py`, shared pytest discovery in `pyproject.toml`, and the frontend `npm run check` script.
 
 ## Commands to run the full project
 
@@ -81,12 +81,13 @@ cd frontend
 npm.cmd run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Run verification:
+Run the repository quality gates:
 
 ```powershell
+python scripts\validate_scenarios.py
 python -m pytest backend\tests -v
 cd frontend
-npm.cmd run build
+npm.cmd run check
 ```
 
 Run the default experiment summary from `backend/`:

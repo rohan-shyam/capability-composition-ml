@@ -1,22 +1,39 @@
 from __future__ import annotations
 
+from typing import Any, TypeVar
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from app.composition import check_compatibility, compose
 from app.composition.composer import CompositionError
-from app.embedding import EmbeddingEncoder, capability_similarity, sparse_cosine
-from app.experiments.runner import load_default_scenario, run_all_experiments
+from app.embedding import EmbeddingEncoder, capability_similarity as compare_capabilities, sparse_cosine
+from app.experiments.runner import run_all_experiments
 from app.models.formal import ApplicationScenario, Capability, Goal, State
 from app.schemas.api import CompositionRequest, GoalRelevanceRequest, SimilarityRequest
-from app.services.formal_logic import satisfies, state_satisfies_goal
+from app.services.applicability import capability_applicability
+from app.services.formal_logic import state_satisfies_goal
+from app.services.relevance import goal_effect_analysis
+from app.services.scenario import ScenarioStore
 
-app = FastAPI(title="Capability Composition Embedding API", version="1.0.0",
-              description="Explainable structured embeddings, compatibility, and composition; no path planning.")
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-                   allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(
+    title="Capability Composition Embedding API",
+    version="1.0.0",
+    description="Explainable structured embeddings, compatibility, and composition; no path planning.",
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 encoder = EmbeddingEncoder()
-scenario = load_default_scenario()
+scenario_store = ScenarioStore.with_default_scenario()
+# Preserve the module-level name used by the original application while the
+# store provides an explicit seam for tests and future persistence.
+scenario = scenario_store.get()
 
 
 @app.get("/api/health")
@@ -32,7 +49,7 @@ def get_scenario() -> ApplicationScenario:
 @app.post("/api/scenario", response_model=ApplicationScenario)
 def set_scenario(body: ApplicationScenario) -> ApplicationScenario:
     global scenario
-    scenario = body
+    scenario = scenario_store.replace(body)
     return scenario
 
 
@@ -56,7 +73,11 @@ def encode_capability(body: Capability) -> dict:
 
 @app.post("/api/similarity")
 def similarity(body: SimilarityRequest) -> dict:
-    return {"similarity": sparse_cosine(body.left, body.right), "metric": "weighted sparse cosine", "interpretation": "representation similarity; does not imply composability"}
+    return {
+        "similarity": sparse_cosine(body.left, body.right),
+        "metric": "weighted sparse cosine",
+        "interpretation": "representation similarity; does not imply composability",
+    }
 
 
 @app.post("/api/similarity/capabilities")
@@ -64,7 +85,11 @@ def capability_similarity(body: CompositionRequest) -> dict:
     if len(body.capabilities) != 2:
         raise HTTPException(422, "Exactly two capabilities are required")
     left, right = body.capabilities
-    return {"left_id": left.id, "right_id": right.id, **capability_similarity(encoder, left, right)}
+    return {
+        "left_id": left.id,
+        "right_id": right.id,
+        **compare_capabilities(encoder, left, right),
+    }
 
 
 @app.post("/api/compatibility")
@@ -77,45 +102,58 @@ def composition(body: CompositionRequest) -> dict:
     try:
         result, checks = compose(body.capabilities)
     except CompositionError as error:
-        raise HTTPException(status_code=422, detail={"message": str(error), "diagnostics": error.diagnostics}) from error
+        raise HTTPException(
+            status_code=422,
+            detail={"message": str(error), "diagnostics": error.diagnostics},
+        ) from error
     vector = encoder.encode_capability(result)
-    return {"composite": result.model_dump(), "embedding": vector, "dimension_count": len(vector), "compatibility_checks": checks}
+    return {
+        "composite": result.model_dump(),
+        "embedding": vector,
+        "dimension_count": len(vector),
+        "compatibility_checks": checks,
+    }
 
 
 @app.post("/api/goal-relevance")
 def goal_relevance(body: GoalRelevanceRequest) -> dict:
-    goal_effects = {condition.name: condition for condition in body.goal.conditions}
-    matched = [effect.name for effect in body.capability.effects if effect.name in goal_effects and effect.operator == goal_effects[effect.name].operator and effect.value == goal_effects[effect.name].value]
-    capability_features = encoder.encode_capability(body.capability)
-    goal_features = {f"effect:{encoder._predicate(item)}": encoder.weights["effect"] for item in body.goal.conditions}
-    capability_effect_features = {key: value for key, value in capability_features.items() if key.startswith("effect:")}
-    return {"capability_id": body.capability.id, "goal_id": body.goal.id, "matched_goal_variables": matched,
-            "effect_overlap": len(matched), "goal_effect_coverage": round(len(matched) / len(body.goal.conditions), 8),
-            "relevant": bool(matched), "goal_effect_similarity": sparse_cosine(capability_effect_features, goal_features)}
+    return {
+        "capability_id": body.capability.id,
+        "goal_id": body.goal.id,
+        **goal_effect_analysis(body.capability, body.goal, encoder),
+    }
+
+
+ModelT = TypeVar("ModelT", bound=BaseModel)
+
+
+def _parse_body_model(body: dict[str, Any], key: str, model: type[ModelT]) -> ModelT:
+    """Convert nested endpoint payloads to formal models with one error path."""
+    try:
+        return model.model_validate(body[key])
+    except (KeyError, ValueError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.post("/api/state-goal")
-def state_goal(body: dict) -> dict:
-    try:
-        state = State.model_validate(body["state"])
-        goal = Goal.model_validate(body["goal"])
-    except (KeyError, ValueError) as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
+def state_goal(body: dict[str, Any]) -> dict:
+    state = _parse_body_model(body, "state", State)
+    goal = _parse_body_model(body, "goal", Goal)
     fulfilled, evidence = state_satisfies_goal(state, goal.conditions)
     return {"state_id": state.id, "goal_id": goal.id, "satisfied": fulfilled, "evidence": evidence}
 
 
 @app.post("/api/applicability")
-def applicability(body: dict) -> dict:
-    try:
-        state = State.model_validate(body["state"])
-        capability = Capability.model_validate(body["capability"])
-    except (KeyError, ValueError) as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
-    predicates = capability.preconditions + capability.constraints
-    evidence = [{"predicate": item.model_dump(), "satisfied": item.name in state.values and
-                 satisfies(state.values[item.name], item.operator, item.value)} for item in predicates]
-    return {"state_id": state.id, "capability_id": capability.id, "applicable": all(row["satisfied"] for row in evidence), "evidence": evidence}
+def applicability(body: dict[str, Any]) -> dict:
+    state = _parse_body_model(body, "state", State)
+    capability = _parse_body_model(body, "capability", Capability)
+    applicable, evidence = capability_applicability(state, capability)
+    return {
+        "state_id": state.id,
+        "capability_id": capability.id,
+        "applicable": applicable,
+        "evidence": evidence,
+    }
 
 
 @app.get("/api/experiments")

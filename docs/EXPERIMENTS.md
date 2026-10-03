@@ -4,7 +4,7 @@
 
 The FastAPI `GET /api/experiments` route calls `run_all_experiments()` on the active scenario. The default comes from `data/scenarios/commerce.json`; the five Level examples are under `data/scenarios/examples/`. The runner discovers candidate pairs and chains from declared formal preconditions, effects, required inputs, and capability types. It does not depend on fixed commerce capability IDs. It returns seven groups: the five required assignment experiments plus state/goal encoding and state awareness.
 
-The captured results below were returned by a running local API at `http://127.0.0.1:8012`. For each dataset, I loaded its JSON using `POST /api/scenario` and then captured `GET /api/experiments`; the API was reset to commerce after the checks. Values below are copied from those responses. Floating-point display is the API's actual output.
+The captured results below were returned by a running local API at `http://127.0.0.1:8012`. Port `8012` is historical for these captures; normal local setup uses `http://127.0.0.1:8000`. For each dataset, I loaded its JSON using `POST /api/scenario` and then captured `GET /api/experiments`; the API was reset to commerce after the checks. Values below are copied from those responses. Floating-point display is the API's actual output.
 
 ## Required experiments and measures
 

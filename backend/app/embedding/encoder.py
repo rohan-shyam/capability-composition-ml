@@ -30,7 +30,7 @@ class EmbeddingEncoder:
     def encode_goal(self, goal: Goal) -> dict[str, float]:
         vector: defaultdict[str, float] = defaultdict(float)
         for item in goal.conditions:
-            vector[f"goal:{self._predicate(item)}"] += 1.0
+            vector[f"goal:{self.predicate_token(item)}"] += 1.0
         return dict(vector)
 
     def encode_capability(self, capability: Capability) -> dict[str, float]:
@@ -67,15 +67,21 @@ class EmbeddingEncoder:
     @staticmethod
     def _add_predicates(vector: defaultdict[str, float], section: str, items: list[Predicate]) -> None:
         for item in items:
-            vector[f"{section}:{EmbeddingEncoder._predicate(item)}"] += 1.0
+            vector[f"{section}:{EmbeddingEncoder.predicate_token(item)}"] += 1.0
 
     @staticmethod
-    def _predicate(item: Predicate) -> str:
+    def predicate_token(item: Predicate) -> str:
+        """Render a predicate as the stable token used by feature dimensions."""
         if item.operator == "in" and isinstance(item.value, list):
             value = "{" + ",".join(sorted(EmbeddingEncoder._atom(v) for v in item.value)) + "}"
         else:
             value = EmbeddingEncoder._atom(item.value)
         return f"{item.name}{item.operator}{value}"
+
+    @staticmethod
+    def _predicate(item: Predicate) -> str:
+        """Backward-compatible internal alias for the public token helper."""
+        return EmbeddingEncoder.predicate_token(item)
 
     @staticmethod
     def _atom(value: Any) -> str:

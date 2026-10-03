@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight, GitCompareArrows, ShieldQuestion, Target } from 'lucide-react'
 import { api } from '../services/api'
+import { useAsyncAction } from '../hooks/useAsyncAction'
 import type { Capability, Scenario } from '../types'
 import type { Notify } from './types'
 import { PageHeading, Panel, Pill, SelectField } from '../components/Primitives'
@@ -10,7 +11,7 @@ export function RelationshipsPage({ scenario, notify }: { scenario: Scenario; no
   const [consumerId, setConsumerId] = useState(scenario.capabilities[1]?.id ?? '')
   const [similarity, setSimilarity] = useState<{ similarity: number; metric: string; section_scores: Record<string, { similarity: number; weight: number }> } | null>(null)
   const [compatibility, setCompatibility] = useState<Awaited<ReturnType<typeof api.compatibility>> | null>(null)
-  const [busy, setBusy] = useState(false)
+  const { busy, run } = useAsyncAction((message) => notify(message, 'error'))
   const [relevanceCapability, setRelevanceCapability] = useState(scenario.capabilities[0]?.id ?? '')
   const [goalId, setGoalId] = useState(scenario.goals[0]?.id ?? '')
   const [relevance, setRelevance] = useState<Awaited<ReturnType<typeof api.goalRelevance>> | null>(null)
@@ -30,28 +31,24 @@ export function RelationshipsPage({ scenario, notify }: { scenario: Scenario; no
 
   async function comparePair() {
     if (!producer || !consumer) return
-    setBusy(true); setCompatibility(null); setSimilarity(null)
-    try {
-      const [similarityResult, compatibilityResult] = await Promise.all([api.compareCapabilities(producer, consumer), api.compatibility(producer, consumer)])
-      setSimilarity(similarityResult); setCompatibility(compatibilityResult)
-    } catch (error) { notify((error as Error).message, 'error') }
-    finally { setBusy(false) }
+    setCompatibility(null)
+    setSimilarity(null)
+    const pair = await run(() => Promise.all([api.compareCapabilities(producer, consumer), api.compatibility(producer, consumer)]))
+    if (!pair) return
+    setSimilarity(pair[0])
+    setCompatibility(pair[1])
   }
 
   async function analyzeGoal() {
     if (!relCap || !goal) return
-    setBusy(true)
-    try { setRelevance(await api.goalRelevance(relCap, goal)) }
-    catch (error) { notify((error as Error).message, 'error') }
-    finally { setBusy(false) }
+    const result = await run(() => api.goalRelevance(relCap, goal))
+    if (result) setRelevance(result)
   }
 
   async function testGoal() {
     if (!state || !goal) return
-    setBusy(true)
-    try { setStateGoal(await api.stateGoal(state, goal)) }
-    catch (error) { notify((error as Error).message, 'error') }
-    finally { setBusy(false) }
+    const result = await run(() => api.stateGoal(state, goal))
+    if (result) setStateGoal(result)
   }
 
   return <>

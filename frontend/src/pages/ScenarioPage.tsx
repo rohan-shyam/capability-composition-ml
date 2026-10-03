@@ -1,7 +1,8 @@
-﻿import { useEffect, useId, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Braces, Download, FileJson2, RotateCcw, Upload } from 'lucide-react'
 import type { Capability, Goal, Predicate, Scenario, State } from '../types'
 import { api } from '../services/api'
+import { errorMessage, useAsyncAction } from '../hooks/useAsyncAction'
 import { Notice, PageHeading, Panel, Pill } from '../components/Primitives'
 import type { Notify } from './types'
 import level1SingleCapability from '../../../data/scenarios/examples/level-1-single-capability.json'
@@ -20,7 +21,6 @@ export function ScenarioPage({ scenario, onScenario, notify, onLoadExample, load
   const [draft, setDraft] = useState<Scenario>(scenario)
   const [advanced, setAdvanced] = useState(false)
   const [json, setJson] = useState(JSON.stringify(scenario, null, 2))
-  const [busy, setBusy] = useState(false)
   const [validation, setValidation] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const [stateId, setStateId] = useState(scenario.states[0]?.id ?? '')
@@ -41,26 +41,39 @@ export function ScenarioPage({ scenario, onScenario, notify, onLoadExample, load
   const valuesForVariable = (name: string) => valueSuggestions.get(name) ?? []
   useEffect(() => { if (!advanced) setJson(serializedDraft) }, [serializedDraft, advanced])
 
+  const reportRequestError = useCallback((message: string) => {
+    setValidation(message)
+    notify(message, 'error')
+  }, [notify])
+  const { busy, run } = useAsyncAction(reportRequestError)
+
   function updateDraft(next: Scenario) { setDraft(next); setValidation(null) }
   async function save() {
-    setBusy(true); setValidation(null)
-    try {
-      const value = advanced ? JSON.parse(json) as unknown as Scenario : draft
-      validateScenario(value)
-      const saved = await api.saveScenario(value)
-      onScenario(saved); setDraft(saved); setJson(JSON.stringify(saved, null, 2)); notify('Scenario validated and saved to the backend.', 'success')
-    } catch (error) { const message = (error as Error).message; setValidation(message); notify(message, 'error') }
-    finally { setBusy(false) }
+    setValidation(null)
+    const value = await run(async () => {
+      const next = advanced ? JSON.parse(json) as unknown as Scenario : draft
+      validateScenario(next)
+      return api.saveScenario(next)
+    })
+    if (!value) return
+    onScenario(value)
+    setDraft(value)
+    setJson(JSON.stringify(value, null, 2))
+    notify('Scenario validated and saved to the backend.', 'success')
   }
   async function reload() {
-    setBusy(true); setValidation(null)
-    try { const current = await api.getScenario(); onScenario(current); setDraft(current); setJson(JSON.stringify(current, null, 2)); notify('Loaded the active scenario from the backend.', 'success') }
-    catch (error) { notify((error as Error).message, 'error') } finally { setBusy(false) }
+    setValidation(null)
+    const current = await run(() => api.getScenario())
+    if (!current) return
+    onScenario(current)
+    setDraft(current)
+    setJson(JSON.stringify(current, null, 2))
+    notify('Loaded the active scenario from the backend.', 'success')
   }
   async function readFile(file?: File) {
     if (!file) return
     try { const text = await file.text(); const parsed = JSON.parse(text) as unknown as Scenario; validateScenario(parsed); setDraft(parsed); setJson(JSON.stringify(parsed, null, 2)); setAdvanced(false); notify(`Imported ${file.name} into the form. Save to validate it with the API.`, 'info') }
-    catch (error) { setValidation((error as Error).message || 'Could not read the selected JSON file.') }
+    catch (error) { setValidation(errorMessage(error) || 'Could not read the selected JSON file.') }
   }
   function download() {
     const text = advanced ? json : serializedDraft
@@ -70,13 +83,13 @@ export function ScenarioPage({ scenario, onScenario, notify, onLoadExample, load
 
   async function checkApplicability() {
     if (!selectedState || !selectedCapability) return
-    try { setApplicability(await api.applicability(selectedState, selectedCapability)) }
-    catch (error) { notify((error as Error).message, 'error') }
+    const result = await run(() => api.applicability(selectedState, selectedCapability), { trackBusy: false })
+    if (result) setApplicability(result)
   }
   async function checkCompatibility() {
     if (!producer || !consumer) return
-    try { setCompatibility(await api.compatibility(producer, consumer)) }
-    catch (error) { notify((error as Error).message, 'error') }
+    const result = await run(() => api.compatibility(producer, consumer), { trackBusy: false })
+    if (result) setCompatibility(result)
   }
 
   return <>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Activity, AlertTriangle, CheckCircle2, FlaskConical, RefreshCw } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../services/api'
+import { useAsyncAction } from '../hooks/useAsyncAction'
 import type { ExperimentReport, Scenario } from '../types'
 import type { Notify } from './types'
 import { EmptyState, Loading, MetricCard, PageHeading, Panel, Pill } from '../components/Primitives'
@@ -9,17 +10,17 @@ import { title } from '../utils/format'
 
 export function ExperimentsPage({ scenario, notify, autoRunToken = 0 }: { scenario: Scenario; notify: Notify; autoRunToken?: number }) {
   const [report, setReport] = useState<ExperimentReport | null>(null)
-  const [busy, setBusy] = useState(false)
+  const { busy, run: runAction } = useAsyncAction((message) => notify(message, 'error'))
 
   async function run() {
-    setBusy(true)
-    try { setReport(await api.experiments()); notify('Experiments completed from the current backend scenario.', 'success') }
-    catch (error) { notify((error as Error).message, 'error') }
-    finally { setBusy(false) }
+    const nextReport = await runAction(() => api.experiments())
+    if (!nextReport) return
+    setReport(nextReport)
+    notify('Experiments completed from the current backend scenario.', 'success')
   }
 
   useEffect(() => { setReport(null) }, [scenario.id, scenario.capabilities])
-  useEffect(() => { if (autoRunToken > 0) void run() }, [autoRunToken])
+  useEffect(() => { if (autoRunToken > 0) void run() }, [autoRunToken, runAction])
   const experiments = Object.fromEntries((report?.experiments ?? []).map((item) => [item.id, item.results]))
   const compatibility = experiments.compatibility
   const alternative = experiments.alternative_implementations?.functional_similarity as Record<string, number | { similarity: number }> | undefined

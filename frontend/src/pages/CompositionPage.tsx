@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowRight, Layers3, RotateCcw, Workflow } from 'lucide-react'
 import { api } from '../services/api'
+import { useAsyncAction } from '../hooks/useAsyncAction'
 import type { Capability, CompositionResult, Scenario } from '../types'
 import { FeatureVectorView } from '../components/FeatureVector'
 import { CapabilityDetails } from '../components/CapabilityDetails'
@@ -11,7 +12,7 @@ export function CompositionPage({ scenario, notify }: { scenario: Scenario; noti
   const defaultChain = scenario.capabilities.slice(0, 3).map((item) => item.id)
   const [chainIds, setChainIds] = useState(defaultChain)
   const [result, setResult] = useState<CompositionResult | null>(null)
-  const [busy, setBusy] = useState(false)
+  const { busy, run } = useAsyncAction((message) => notify(message, 'error'))
   const [showVector, setShowVector] = useState(true)
   const selected = chainIds.map((id) => scenario.capabilities.find((item) => item.id === id)).filter((item): item is Capability => Boolean(item))
 
@@ -24,10 +25,11 @@ export function CompositionPage({ scenario, notify }: { scenario: Scenario; noti
 
   async function build() {
     if (selected.length < 2) return
-    setBusy(true); setResult(null)
-    try { setResult(await api.compose(selected)); notify('Composite capability constructed by the backend.', 'success') }
-    catch (error) { notify((error as Error).message, 'error') }
-    finally { setBusy(false) }
+    setResult(null)
+    const composition = await run(() => api.compose(selected))
+    if (!composition) return
+    setResult(composition)
+    notify('Composite capability constructed by the backend.', 'success')
   }
 
   return <>
